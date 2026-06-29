@@ -1,6 +1,6 @@
 # context-nap.nvim
 
-A lightweight, high-performance transient state toggler for Neovim. Temporarily silence diagnostics and clean up your UI canvas on-the-fly without altering your disk-backed session state.
+A lightweight, transient state toggler for Neovim. Temporarily silence diagnostics and clean up UI canvas for the session.
 
 ## Installation
 
@@ -8,7 +8,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-    "ItzArka1407/context-nap.nvim",
+    "ItzArka1407/focus-nap.nvim",
     keys = {
         { "<leader>fn", "<cmd>ContextNapToggle<CR>", desc = "Toggle Focus Mode" },
     },
