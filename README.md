@@ -1,6 +1,6 @@
-# context-nap.nvim
+# focus-nap.nvim
 
-A lightweight, transient state toggler for Neovim. Temporarily silence diagnostics and clean up UI canvas for the session.
+Lightweight, transient state toggler for Neovim. Temporarily silence diagnostics and clean up UI canvas for the session.
 
 ## Installation
 
