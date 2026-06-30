@@ -6,6 +6,7 @@ local cache = {
     diagnostics_enabled = true,
     wo_number = true,
     wo_relativenumber = true,
+    focused_win_id = nil,
 }
 
 -- Toggling the states
@@ -14,6 +15,7 @@ function M.toggle()
 
     if not is_focused then
         is_focused = true -- Enter focus mode
+        cache.focused_win_id = current_win
 
         -- Stop all the diagnostics
         if config.options.disable_diagnostics then
@@ -40,10 +42,15 @@ function M.toggle()
         end
 
         if config.options.hide_line_numbers then
-            vim.wo[current_win].number = cache.wo_number
-            vim.wo[current_win].relativenumber = cache.wo_relativenumber
+            local target_win = cache.focused_win_id
+
+            if target_win and vim.api.nvim_win_is_valid(target_win) then
+                vim.wo[current_win].number = cache.wo_number
+                vim.wo[current_win].relativenumber = cache.wo_relativenumber
+            end
         end
 
+        cache.focused_win_id = nil
         print("[ContextNap]: Focus Mode deactivated")
     end
 end
