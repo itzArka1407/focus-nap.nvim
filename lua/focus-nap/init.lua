@@ -2,56 +2,95 @@
 local M = {}
 local config = require("focus-nap.config")
 
-function M.toggle()
-    local current_win = vim.api.nvim_get_current_win()
+-- Track diagnostic state globally for the plugin session
+local is_diag_enabled = vim.diagnostic.is_enabled()
 
-    -- Check if THIS SPECIFIC window is already focused by querying its metadata
-    local is_win_focused = vim.w[current_win].focus_nap_active or false
-
-    if not is_win_focused then
-        -- 1. ENTER FOCUS MODE FOR THIS WINDOW
-        vim.w[current_win].focus_nap_active = true
-
-        if config.options.disable_diagnostics then
-            -- Cache the diagnostic state directly inside the window's metadata
-            vim.w[current_win].old_diagnostics_state = vim.diagnostic.is_enabled()
-            vim.diagnostic.enable(false)
-        end
-
-        if config.options.hide_line_numbers then
-            -- Cache the line number states directly inside the window's metadata
-            vim.w[current_win].old_number = vim.wo[current_win].number
-            vim.w[current_win].old_relativenumber = vim.wo[current_win].relativenumber
-
-            vim.wo[current_win].number = false
-            vim.wo[current_win].relativenumber = false
-        end
-
-        print("[FocusNap] Window distractions muted.")
+-- Toggle the Diagnostics globally
+function M.toggle_diagnostics()
+    if is_diag_enabled then
+        is_diag_enabled = false
+        print("[FocusNap] Diagnostics muted globally.")
     else
-        -- 2. EXIT FOCUS MODE FOR THIS WINDOW
-        vim.w[current_win].focus_nap_active = false
-
-        if config.options.disable_diagnostics then
-            -- Fallback to true if for some reason the metadata metadata is missing
-            local old_diag = vim.w[current_win].old_diagnostics_state
-            if old_diag ~= nil then
-                vim.diagnostic.enable(old_diag)
-            else
-                vim.diagnostic.enable(true)
-            end
-        end
-
-        if config.options.hide_line_numbers then
-            -- Restore options to this window using its own stored metadata
-            if vim.w[current_win].old_number ~= nil then
-                vim.wo[current_win].number = vim.w[current_win].old_number
-                vim.wo[current_win].relativenumber = vim.w[current_win].old_relativenumber
-            end
-        end
-
-        print("[FocusNap] Window workspace restored.")
+        is_diag_enabled = true
+        print("[FocusNap] Diagnostics restored globally.")
     end
+    vim.diagnostic.enable(is_diag_enabled)
+end
+
+-- Toggle line numbers
+function M.toggle_numbers()
+    local operation_window = vim.api.nvim_get_current_win()
+    local is_win_lines_vis = vim.wo[operation_window].number
+
+    if is_win_lines_vis then
+        print("[FocusNap] Switching off lines")
+    else
+        print("[FocusNap] Showing Lines")
+    end
+
+    vim.o.number = not is_win_lines_vis
+    vim.o.relativenumber = not is_win_lines_vis
+    vim.wo[operation_window].number = not is_win_lines_vis
+end
+
+-- Open the main menu
+function M.open_menu()
+    local target_window = vim.api.nvim_get_current_win()
+    local buf = vim.api.nvim_create_buf(false, true)
+
+    local lines = {
+        "[1]. Toggle Diagnostics",
+        "[2]. Toggle Line Numbers",
+        "[3]. Toggle Signcolumn"
+    }
+
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+    local screen_width = vim.o.columns
+    local screen_height = vim.o.lines
+
+    local win_width = 30
+    local win_height = #lines
+
+    -- Centering logic
+    local col = math.ceil((screen_width - win_width) / 2)
+    local row = math.ceil((screen_height - win_height) / 2) - 1
+
+    local window_ui_opts = {
+        relative = "editor",
+        row = row,
+        col = col,
+        width = win_width,
+        height = win_height,
+        style = "minimal",
+        border = "rounded",
+    }
+
+    local window = vim.api.nvim_open_win(buf, true, window_ui_opts)
+
+    vim.wo[window].wrap = false
+    vim.bo[buf].modifiable = false
+    vim.bo[buf].filetype = "focusnapmenu"
+
+    local map_opts = { silent = true, noremap = true, buffer = buf }
+    vim.keymap.set("n", "q", "<cmd>close<CR>", map_opts)
+    vim.keymap.set("n", "<Esc>", "<cmd>close<CR>", map_opts)
+
+    vim.keymap.set("n", "<CR>", function()
+        local cursor_line = vim.api.nvim_win_get_cursor(window)[1]
+        vim.api.nvim_win_close(window, true)
+
+        if cursor_line == 1 then
+            -- Notice we don't pass target_window anymore; it's a global toggle now
+            M.toggle_diagnostics()
+        elseif cursor_line == 2 then
+            M.toggle_numbers(target_window)
+        elseif cursor_line == 3 then
+            print("[FocusNap] SignColumn feature coming soon")
+        end
+    end, map_opts)
+
+    return buf, window
 end
 
 function M.setup(opts)
