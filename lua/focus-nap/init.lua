@@ -1,61 +1,59 @@
+-- lua/focus-nap/init.lua
 local M = {}
 local config = require("focus-nap.config")
 
-local is_focused = false -- If the local mode is turned on
-local cache = {
-    diagnostics_enabled = true,
-    wo_number = true,
-    wo_relativenumber = true,
-    focused_win_id = nil,
-}
-
--- Toggling the states
 function M.toggle()
     local current_win = vim.api.nvim_get_current_win()
 
-    if not is_focused then
-        is_focused = true -- Enter focus mode
-        cache.focused_win_id = current_win
+    -- Check if THIS SPECIFIC window is already focused by querying its metadata
+    local is_win_focused = vim.w[current_win].focus_nap_active or false
 
-        -- Stop all the diagnostics
+    if not is_win_focused then
+        -- 1. ENTER FOCUS MODE FOR THIS WINDOW
+        vim.w[current_win].focus_nap_active = true
+
         if config.options.disable_diagnostics then
-            cache.diagnostics_enabled = vim.diagnostic.is_enabled()
+            -- Cache the diagnostic state directly inside the window's metadata
+            vim.w[current_win].old_diagnostics_state = vim.diagnostic.is_enabled()
             vim.diagnostic.enable(false)
         end
 
-        -- Hide the line numbers, hide the relative line numbers
         if config.options.hide_line_numbers then
-            cache.wo_number = vim.wo[current_win].number
-            cache.wo_relativenumber = vim.wo[current_win].relativenumber
+            -- Cache the line number states directly inside the window's metadata
+            vim.w[current_win].old_number = vim.wo[current_win].number
+            vim.w[current_win].old_relativenumber = vim.wo[current_win].relativenumber
 
             vim.wo[current_win].number = false
             vim.wo[current_win].relativenumber = false
         end
 
-        print("[ContextNap]: Focus Mode activated")
+        print("[FocusNap] Window distractions muted.")
     else
-        -- Existing focus mode, read from cache and apply the rules
-        is_focused = false
+        -- 2. EXIT FOCUS MODE FOR THIS WINDOW
+        vim.w[current_win].focus_nap_active = false
 
         if config.options.disable_diagnostics then
-            vim.diagnostic.enable(cache.diagnostics_enabled)
-        end
-
-        if config.options.hide_line_numbers then
-            local target_win = cache.focused_win_id
-
-            if target_win and vim.api.nvim_win_is_valid(target_win) then
-                vim.wo[current_win].number = cache.wo_number
-                vim.wo[current_win].relativenumber = cache.wo_relativenumber
+            -- Fallback to true if for some reason the metadata metadata is missing
+            local old_diag = vim.w[current_win].old_diagnostics_state
+            if old_diag ~= nil then
+                vim.diagnostic.enable(old_diag)
+            else
+                vim.diagnostic.enable(true)
             end
         end
 
-        cache.focused_win_id = nil
-        print("[ContextNap]: Focus Mode deactivated")
+        if config.options.hide_line_numbers then
+            -- Restore options to this window using its own stored metadata
+            if vim.w[current_win].old_number ~= nil then
+                vim.wo[current_win].number = vim.w[current_win].old_number
+                vim.wo[current_win].relativenumber = vim.w[current_win].old_relativenumber
+            end
+        end
+
+        print("[FocusNap] Window workspace restored.")
     end
 end
 
--- Pass the args provided by the user to the initializer
 function M.setup(opts)
     config.setup(opts)
 end
