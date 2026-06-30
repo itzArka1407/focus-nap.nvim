@@ -2,46 +2,56 @@
 local M = {}
 local config = require("focus-nap.config")
 
--- Track diagnostic state globally for the plugin session
-local is_diag_enabled = vim.diagnostic.is_enabled()
-
 -- Toggle the Diagnostics globally
 function M.toggle_diagnostics()
-    if is_diag_enabled then
-        is_diag_enabled = false
-        print("[FocusNap] Diagnostics muted globally.")
-    else
-        is_diag_enabled = true
-        print("[FocusNap] Diagnostics restored globally.")
-    end
+    local is_diag_enabled = not vim.diagnostic.is_enabled()
     vim.diagnostic.enable(is_diag_enabled)
+
+    return is_diag_enabled
 end
 
 -- Toggle line numbers
-function M.toggle_numbers()
+function M.toggle_lines_number()
     local operation_window = vim.api.nvim_get_current_win()
     local is_win_lines_vis = vim.wo[operation_window].number
 
-    if is_win_lines_vis then
-        print("[FocusNap] Switching off lines")
-    else
-        print("[FocusNap] Showing Lines")
-    end
+    is_win_lines_vis = not is_win_lines_vis
+    vim.o.number = is_win_lines_vis
+    vim.o.relativenumber = is_win_lines_vis
+    vim.wo[operation_window].number = is_win_lines_vis
 
-    vim.o.number = not is_win_lines_vis
-    vim.o.relativenumber = not is_win_lines_vis
-    vim.wo[operation_window].number = not is_win_lines_vis
+    return is_win_lines_vis
+end
+
+function M.toggle_focus_mode()
+    local opt_win = vim.api.nvim_get_current_win()
+    local is_win_lines_vis = vim.wo[opt_win].number
+
+    -- Both lines and diagnostics are off(focus mode on) -- so turn off focus mode now
+    if not is_win_lines_vis and not is_diag_enabled then
+        M.toggle_lines_number()
+        M.toggle_diagnostics()
+        print("[FocusNap] Focus Mode off")
+    else
+        if is_win_lines_vis then
+            M.toggle_lines_number()
+        end
+        if is_diag_enabled then
+            M.toggle_diagnostics()
+        end
+        print("[FocusNap] Focus Mode on")
+    end
 end
 
 -- Open the main menu
 function M.open_menu()
-    local target_window = vim.api.nvim_get_current_win()
     local buf = vim.api.nvim_create_buf(false, true)
 
     local lines = {
-        "[1]. Toggle Diagnostics",
-        "[2]. Toggle Line Numbers",
-        "[3]. Toggle Signcolumn"
+        "[1]. Toggle Focus Mode",
+        "[2]. Toggle Diagnostics",
+        "[3]. Toggle Line Numbers",
+        "[4]. Toggle Signcolumn"
     }
 
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
@@ -81,11 +91,23 @@ function M.open_menu()
         vim.api.nvim_win_close(window, true)
 
         if cursor_line == 1 then
-            -- Notice we don't pass target_window anymore; it's a global toggle now
-            M.toggle_diagnostics()
+            M.toggle_focus_mode()
         elseif cursor_line == 2 then
-            M.toggle_numbers(target_window)
+            local is_diag_enabled = M.toggle_diagnostics()
+            if is_diag_enabled then
+                print("[FocusNap] Diagnostics turned on globally")
+            else
+                print("[FocusNap] Diagnostics turned off globally")
+            end
         elseif cursor_line == 3 then
+            local lines_are_vis = M.toggle_lines_number()
+
+            if lines_are_vis then
+                print("[FocusNap] Line numbers switched on")
+            else
+                print("[FocusNap] Line numbers switched off")
+            end
+        elseif cursor_line == 4 then
             print("[FocusNap] SignColumn feature coming soon")
         end
     end, map_opts)
